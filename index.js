@@ -6,13 +6,17 @@ const {
   Routes,
   SlashCommandBuilder,
   PermissionsBitField,
-  MessageFlags
+  MessageFlags,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle
 } = require('discord.js');
 require('dotenv').config();
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const botToken = process.env.DISCORD_TOKEN || process.env.TOKEN;
-const MAX_MESSAGE_LENGTH = 2000;
+const MAX_EMBED_DESCRIPTION_LENGTH = 3800;
 
 function isModeratorOrAbove(interaction) {
   if (!interaction.inGuild() || !interaction.guild) return false;
@@ -106,26 +110,22 @@ const rest = new REST({ version: '10' }).setToken(botToken);
   }
 })();
 
-function splitIntoMessages(header, lines) {
-  const messages = [];
-  let current = header;
-
-  if (lines.length === 0) {
-    return [`${header}\nNo roles found.`];
-  }
+function splitLinesForEmbeds(lines, maxLength = MAX_EMBED_DESCRIPTION_LENGTH) {
+  const chunks = [];
+  let current = '';
 
   for (const line of lines) {
-    const next = `${current}\n${line}`;
-    if (next.length > MAX_MESSAGE_LENGTH) {
-      messages.push(current);
+    const next = current ? `${current}\n${line}` : line;
+    if (next.length > maxLength) {
+      if (current) chunks.push(current);
       current = line;
     } else {
       current = next;
     }
   }
 
-  if (current) messages.push(current);
-  return messages;
+  if (current) chunks.push(current);
+  return chunks.length > 0 ? chunks : ['No roles found.'];
 }
 
 // Handle command interaction
@@ -134,11 +134,31 @@ client.on('interactionCreate', async interaction => {
 
   try {
     if (interaction.commandName === 'links') {
-      await interaction.reply(
-        "🌐 Official Virtual Airline Websites:\n" +
-        "• Singapore Airlines Virtual: https://sia-virtual-4112e817.base44.app/\n" +
-        "• FAA Virtual (Founded by SIA Virtual): https://faav-aviation-excellence-a28cb7d5.base44.app/"
+      const linksEmbed = new EmbedBuilder()
+        .setColor(0x1f6feb)
+        .setTitle('SIA Virtual Official Links')
+        .setDescription(
+          [
+            'Use the buttons below to open each official website.',
+            '[Singapore Airlines Virtual](https://sia-virtual-4112e817.base44.app/)',
+            '[FAA Virtual](https://faav-aviation-excellence-a28cb7d5.base44.app/)'
+          ].join('\n')
+        )
+        .setFooter({ text: 'SIA Virtual Services' })
+        .setTimestamp();
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setLabel('Singapore Airlines Virtual')
+          .setStyle(ButtonStyle.Link)
+          .setURL('https://sia-virtual-4112e817.base44.app/'),
+        new ButtonBuilder()
+          .setLabel('FAA Virtual')
+          .setStyle(ButtonStyle.Link)
+          .setURL('https://faav-aviation-excellence-a28cb7d5.base44.app/')
       );
+
+      await interaction.reply({ embeds: [linksEmbed], components: [row] });
       return;
     }
 
@@ -162,22 +182,25 @@ client.on('interactionCreate', async interaction => {
       const roles = interaction.guild.roles.cache
         .filter(role => role.name !== '@everyone')
         .sort((a, b) => b.position - a.position)
-        .map((role, index) => `${index + 1}. ${role.name} (\`${role.id}\`)`)
+        .map((role, index) => `${index + 1}. **${role.name}** • \`${role.id}\``)
         .slice(0, 100);
 
-      const header = `📋 Roles in **${interaction.guild.name}** (${roles.length} shown):`;
-      const messages = splitIntoMessages(header, roles);
+      const chunks = splitLinesForEmbeds(roles);
+      const embeds = chunks.map((chunk, index) =>
+        new EmbedBuilder()
+          .setColor(0x2b8a3e)
+          .setTitle(`Server Roles • ${interaction.guild.name}`)
+          .setDescription(chunk)
+          .setFooter({
+            text: `Page ${index + 1}/${chunks.length} • ${roles.length} roles shown`
+          })
+          .setTimestamp()
+      );
 
-      await interaction.reply({
-        content: messages[0],
-        flags: MessageFlags.Ephemeral
-      });
+      await interaction.reply({ embeds: [embeds[0]], flags: MessageFlags.Ephemeral });
 
-      for (let i = 1; i < messages.length; i += 1) {
-        await interaction.followUp({
-          content: messages[i],
-          flags: MessageFlags.Ephemeral
-        });
+      for (let i = 1; i < embeds.length; i += 1) {
+        await interaction.followUp({ embeds: [embeds[i]], flags: MessageFlags.Ephemeral });
       }
     }
   } catch (error) {
