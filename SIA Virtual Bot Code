@@ -1,0 +1,47 @@
+// SIA Virtual Bot Code with Slash Command
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
+require('dotenv').config({ path: './SIABOTprivateinfo.env' });
+
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+
+// Define the /links command
+const commands = [
+  new SlashCommandBuilder()
+    .setName('links')
+    .setDescription('List official virtual airline websites')
+].map(command => command.toJSON());
+
+// Register the command with Discord
+const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+
+(async () => {
+  try {
+    console.log('🔄 Registering slash commands...');
+    await rest.put(
+      Routes.applicationCommands(process.env.CLIENT_ID),
+      { body: commands }
+    );
+    console.log('✅ Slash commands registered!');
+  } catch (error) {
+    console.error(error);
+  }
+})();
+
+// Handle command interaction
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isChatInputCommand()) return;
+
+  if (interaction.commandName === 'links') {
+    await interaction.reply(
+      "🌐 Official Virtual Airline Websites:\n" +
+      "• Singapore Airlines Virtual: https://sia-virtual-4112e817.base44.app/\n" +
+      "• FAA Virtual (Founded by SIA Virtual): https://faav-aviation-excellence-a28cb7d5.base44.app/"
+    );
+  }
+});
+
+client.once('ready', () => {
+  console.log(`✅ Logged in as ${client.user.tag}`);
+});
+
+client.login(process.env.TOKEN);
