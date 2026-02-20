@@ -182,25 +182,30 @@ client.on('interactionCreate', async interaction => {
       const roles = interaction.guild.roles.cache
         .filter(role => role.name !== '@everyone')
         .sort((a, b) => b.position - a.position)
-        .map((role, index) => `${index + 1}. **${role.name}** • \`${role.id}\``)
+        .map(role => `<@&${role.id}>`)
         .slice(0, 100);
 
       const chunks = splitLinesForEmbeds(roles);
       const embeds = chunks.map((chunk, index) =>
         new EmbedBuilder()
           .setColor(0x2b8a3e)
-          .setTitle(`Server Roles • ${interaction.guild.name}`)
+          .setTitle(`Server Roles`)
           .setDescription(chunk)
-          .setFooter({
-            text: `Page ${index + 1}/${chunks.length} • ${roles.length} roles shown`
-          })
           .setTimestamp()
       );
 
-      await interaction.reply({ embeds: [embeds[0]], flags: MessageFlags.Ephemeral });
+      await interaction.reply({
+        embeds: [embeds[0]],
+        flags: MessageFlags.Ephemeral,
+        allowedMentions: { parse: [] }
+      });
 
       for (let i = 1; i < embeds.length; i += 1) {
-        await interaction.followUp({ embeds: [embeds[i]], flags: MessageFlags.Ephemeral });
+        await interaction.followUp({
+          embeds: [embeds[i]],
+          flags: MessageFlags.Ephemeral,
+          allowedMentions: { parse: [] }
+        });
       }
     }
   } catch (error) {
