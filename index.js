@@ -10,6 +10,7 @@ const {
 require('dotenv').config();
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const botToken = process.env.DISCORD_TOKEN || process.env.TOKEN;
 
 function isModeratorOrAbove(interaction) {
   if (!interaction.inGuild() || !interaction.guild) return false;
@@ -60,13 +61,33 @@ const commands = [
 ].map(command => command.toJSON());
 
 // Register the command with Discord
-const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+if (!process.env.CLIENT_ID) {
+  throw new Error('Missing CLIENT_ID environment variable');
+}
+
+if (!botToken) {
+  throw new Error('Missing DISCORD_TOKEN (or TOKEN) environment variable');
+}
+
+const rest = new REST({ version: '10' }).setToken(botToken);
 
 (async () => {
   try {
-    console.log('🔄 Registering slash commands...');
+    const commandNames = commands.map(command => command.name).join(', ');
+    console.log(`🔄 Registering slash commands: ${commandNames}`);
+
+    const route = process.env.GUILD_ID
+      ? Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID)
+      : Routes.applicationCommands(process.env.CLIENT_ID);
+
+    console.log(
+      process.env.GUILD_ID
+        ? `📍 Registering as guild commands for GUILD_ID=${process.env.GUILD_ID}`
+        : '🌍 Registering as global commands (can take time to appear)'
+    );
+
     await rest.put(
-      Routes.applicationCommands(process.env.CLIENT_ID),
+      route,
       { body: commands }
     );
     console.log('✅ Slash commands registered!');
@@ -122,4 +143,4 @@ client.once('ready', () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
-client.login(process.env.TOKEN);
+client.login(botToken);
